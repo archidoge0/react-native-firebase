@@ -15,6 +15,16 @@
  *
  */
 
+#if RNFB_DATABASE_UNIT_TEST
+
+#import <Foundation/Foundation.h>
+#import "RNFBSharedUtils.h"
+
+@interface RNFBDatabaseTransactionHelper : NSObject
+@end
+
+#else
+
 #if __has_include(<Firebase/Firebase.h>)
 #import <Firebase/Firebase.h>
 #else
@@ -28,10 +38,23 @@
 #import "RNFBDatabaseTransactionHelper.h"
 #import "RNFBRCTEventEmitter.h"
 
+#endif
+
+#if !RNFB_DATABASE_UNIT_TEST
 static __strong NSMutableDictionary *transactions;
 static NSString *const RNFB_DATABASE_TRANSACTION_EVENT = @"database_transaction_event";
+#endif
 
 @implementation RNFBDatabaseTransactionHelper
+
+/**
+ * Testable seam: decode New Architecture null sentinels before storing a transaction value.
+ */
++ (id)decodedTransactionValue:(id)value {
+  return [RNFBSharedUtils decodeNullSentinels:value];
+}
+
+#if !RNFB_DATABASE_UNIT_TEST
 
 + (dispatch_queue_t)transactionQueue {
   static dispatch_once_t once;
@@ -163,11 +186,13 @@ static NSString *const RNFB_DATABASE_TRANSACTION_EVENT = @"database_transaction_
   if (abort) {
     [transactionState setValue:@true forKey:@"abort"];
   } else {
-    id newValue = [updates valueForKey:@"value"];
+    id newValue = [self decodedTransactionValue:[updates valueForKey:@"value"]];
     [transactionState setValue:newValue forKey:@"value"];
   }
 
   dispatch_semaphore_signal([transactionState valueForKey:@"semaphore"]);
 }
+
+#endif
 
 @end

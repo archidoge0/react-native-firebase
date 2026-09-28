@@ -15,6 +15,16 @@
  *
  */
 
+#if RNFB_DATABASE_UNIT_TEST
+
+#import <Foundation/Foundation.h>
+#import "RNFBSharedUtils.h"
+
+@interface RNFBDatabaseReferenceHelper : NSObject
+@end
+
+#else
+
 #if __has_include(<Firebase/Firebase.h>)
 #import <Firebase/Firebase.h>
 #else
@@ -23,10 +33,31 @@
 #endif
 
 #import "RNFBApp/RCTConvert+FIRApp.h"
+#import "RNFBApp/RNFBSharedUtils.h"
 #import "RNFBDatabaseCommon.h"
 #import "RNFBDatabaseReferenceHelper.h"
 
+#endif
+
 @implementation RNFBDatabaseReferenceHelper
+
+/**
+ * Testable seam: decode New Architecture null sentinels before FIRDatabaseReference writes.
+ * Top-level set(null) arrives as props.value = { __rnfbNull: true }.
+ */
++ (id)decodedValueFromProps:(NSDictionary *)props {
+  return [RNFBSharedUtils decodeNullSentinels:[props valueForKey:@"value"]];
+}
+
++ (id)decodedValuesFromProps:(NSDictionary *)props {
+  return [RNFBSharedUtils decodeNullSentinels:[props valueForKey:@"values"]];
+}
+
++ (id)decodedPriorityFromProps:(NSDictionary *)props {
+  return [RNFBSharedUtils decodeNullSentinels:[props valueForKey:@"priority"]];
+}
+
+#if !RNFB_DATABASE_UNIT_TEST
 
 + (void)set:(NSString *)app
       dbURL:(NSString *)dbURL
@@ -39,7 +70,7 @@
   FIRDatabaseReference *firDatabaseReference =
       [RNFBDatabaseCommon getReferenceForDatabase:firDatabase path:path];
 
-  [firDatabaseReference setValue:[props valueForKey:@"value"]
+  [firDatabaseReference setValue:[self decodedValueFromProps:props]
              withCompletionBlock:^(NSError *error, FIRDatabaseReference *ref) {
                if (error != nil) {
                  [RNFBDatabaseCommon promiseRejectDatabaseException:reject error:error];
@@ -60,7 +91,7 @@
   FIRDatabaseReference *firDatabaseReference =
       [RNFBDatabaseCommon getReferenceForDatabase:firDatabase path:path];
 
-  [firDatabaseReference updateChildValues:[props valueForKey:@"values"]
+  [firDatabaseReference updateChildValues:[self decodedValuesFromProps:props]
                       withCompletionBlock:^(NSError *error, FIRDatabaseReference *ref) {
                         if (error != nil) {
                           [RNFBDatabaseCommon promiseRejectDatabaseException:reject error:error];
@@ -81,8 +112,8 @@
   FIRDatabaseReference *firDatabaseReference =
       [RNFBDatabaseCommon getReferenceForDatabase:firDatabase path:path];
 
-  [firDatabaseReference setValue:[props valueForKey:@"value"]
-                     andPriority:[props valueForKey:@"priority"]
+  [firDatabaseReference setValue:[self decodedValueFromProps:props]
+                     andPriority:[self decodedPriorityFromProps:props]
              withCompletionBlock:^(NSError *error, FIRDatabaseReference *ref) {
                if (error != nil) {
                  [RNFBDatabaseCommon promiseRejectDatabaseException:reject error:error];
@@ -123,7 +154,7 @@
   FIRDatabaseReference *firDatabaseReference =
       [RNFBDatabaseCommon getReferenceForDatabase:firDatabase path:path];
 
-  [firDatabaseReference setPriority:[props valueForKey:@"priority"]
+  [firDatabaseReference setPriority:[self decodedPriorityFromProps:props]
                 withCompletionBlock:^(NSError *error, FIRDatabaseReference *ref) {
                   if (error != nil) {
                     [RNFBDatabaseCommon promiseRejectDatabaseException:reject error:error];
@@ -132,5 +163,7 @@
                   }
                 }];
 }
+
+#endif
 
 @end

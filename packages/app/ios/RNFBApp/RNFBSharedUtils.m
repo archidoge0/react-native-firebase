@@ -16,6 +16,7 @@
  */
 
 #import "RNFBSharedUtils.h"
+#if !RNFB_DATABASE_UNIT_TEST
 #import "RNFBAppModule.h"
 #import "RNFBJSON.h"
 #import "RNFBMeta.h"
@@ -27,8 +28,12 @@
 
 NSString *const DEFAULT_APP_DISPLAY_NAME = @"[DEFAULT]";
 NSString *const DEFAULT_APP_NAME = @"__FIRAPP_DEFAULT";
+#endif
 
 @implementation RNFBSharedUtils
+
+#if !RNFB_DATABASE_UNIT_TEST
+
 static NSString *const RNFBErrorDomain = @"RNFBErrorDomain";
 
 #pragma mark -
@@ -164,6 +169,8 @@ static NSString *const RNFBErrorDomain = @"RNFBErrorDomain";
 
   return enabled;
 }
+
+#endif
 
 /**
  * Decodes null sentinel objects back to NSNull values.

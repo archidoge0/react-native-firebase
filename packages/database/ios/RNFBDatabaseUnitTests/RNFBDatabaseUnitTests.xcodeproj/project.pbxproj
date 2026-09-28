@@ -12,6 +12,11 @@
 		D8000000000000000000000C /* RNFBDatabaseListenerRegistryTests.m in Sources */ = {isa = PBXBuildFile; fileRef = D80000000000000000000009 /* RNFBDatabaseListenerRegistryTests.m */; };
 		D80000000000000000000020 /* RNFBDatabaseQueryRegistry.m in Sources */ = {isa = PBXBuildFile; fileRef = D80000000000000000000021 /* RNFBDatabaseQueryRegistry.m */; };
 		D80000000000000000000022 /* RNFBDatabaseQueryRegistryTests.m in Sources */ = {isa = PBXBuildFile; fileRef = D80000000000000000000023 /* RNFBDatabaseQueryRegistryTests.m */; };
+		D80000000000000000000030 /* RNFBSharedUtils.m in Sources */ = {isa = PBXBuildFile; fileRef = D80000000000000000000031 /* RNFBSharedUtils.m */; };
+		D80000000000000000000032 /* RNFBDatabaseReferenceHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = D80000000000000000000033 /* RNFBDatabaseReferenceHelper.m */; };
+		D80000000000000000000034 /* RNFBDatabaseOnDisconnectHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = D80000000000000000000035 /* RNFBDatabaseOnDisconnectHelper.m */; };
+		D80000000000000000000036 /* RNFBDatabaseTransactionHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = D80000000000000000000037 /* RNFBDatabaseTransactionHelper.m */; };
+		D80000000000000000000038 /* RNFBDatabaseNullSentinelDecodeTests.m in Sources */ = {isa = PBXBuildFile; fileRef = D80000000000000000000039 /* RNFBDatabaseNullSentinelDecodeTests.m */; };
 		D80000000000000000000015 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D80000000000000000000014 /* XCTest.framework */; };
 /* End PBXBuildFile section */
 
@@ -25,6 +30,12 @@
 		D80000000000000000000024 /* RNFBDatabaseQueryRegistry.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RNFBDatabaseQueryRegistry.h; path = ../RNFBDatabase/RNFBDatabaseQueryRegistry.h; sourceTree = SOURCE_ROOT; };
 		D80000000000000000000021 /* RNFBDatabaseQueryRegistry.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = RNFBDatabaseQueryRegistry.m; path = ../RNFBDatabase/RNFBDatabaseQueryRegistry.m; sourceTree = SOURCE_ROOT; };
 		D80000000000000000000023 /* RNFBDatabaseQueryRegistryTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RNFBDatabaseQueryRegistryTests.m; sourceTree = "<group>"; };
+		D80000000000000000000031 /* RNFBSharedUtils.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = RNFBSharedUtils.m; path = ../../../app/ios/RNFBApp/RNFBSharedUtils.m; sourceTree = SOURCE_ROOT; };
+		D8000000000000000000003A /* RNFBSharedUtils.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RNFBSharedUtils.h; path = ../../../app/ios/RNFBApp/RNFBSharedUtils.h; sourceTree = SOURCE_ROOT; };
+		D80000000000000000000033 /* RNFBDatabaseReferenceHelper.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = RNFBDatabaseReferenceHelper.m; path = ../RNFBDatabase/RNFBDatabaseReferenceHelper.m; sourceTree = SOURCE_ROOT; };
+		D80000000000000000000035 /* RNFBDatabaseOnDisconnectHelper.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = RNFBDatabaseOnDisconnectHelper.m; path = ../RNFBDatabase/RNFBDatabaseOnDisconnectHelper.m; sourceTree = SOURCE_ROOT; };
+		D80000000000000000000037 /* RNFBDatabaseTransactionHelper.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = RNFBDatabaseTransactionHelper.m; path = ../RNFBDatabase/RNFBDatabaseTransactionHelper.m; sourceTree = SOURCE_ROOT; };
+		D80000000000000000000039 /* RNFBDatabaseNullSentinelDecodeTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = RNFBDatabaseNullSentinelDecodeTests.m; sourceTree = "<group>"; };
 		D80000000000000000000014 /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
 
@@ -65,8 +76,14 @@
 				D80000000000000000000018 /* RNFBDatabaseListenerRegistry.m */,
 				D80000000000000000000024 /* RNFBDatabaseQueryRegistry.h */,
 				D80000000000000000000021 /* RNFBDatabaseQueryRegistry.m */,
+				D8000000000000000000003A /* RNFBSharedUtils.h */,
+				D80000000000000000000031 /* RNFBSharedUtils.m */,
+				D80000000000000000000033 /* RNFBDatabaseReferenceHelper.m */,
+				D80000000000000000000035 /* RNFBDatabaseOnDisconnectHelper.m */,
+				D80000000000000000000037 /* RNFBDatabaseTransactionHelper.m */,
 				D80000000000000000000009 /* RNFBDatabaseListenerRegistryTests.m */,
 				D80000000000000000000023 /* RNFBDatabaseQueryRegistryTests.m */,
+				D80000000000000000000039 /* RNFBDatabaseNullSentinelDecodeTests.m */,
 			);
 			name = Sources;
 			sourceTree = "<group>";
@@ -114,7 +131,7 @@
 				Base,
 			);
 			mainGroup = D80000000000000000000004;
-			productRefGroup = D80000000000000000000005 /* Products */;
+			productRefGroup = D80000000000000000005 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -131,8 +148,13 @@
 				D8000000000000000000000A /* RNFBHandleMap.m in Sources */,
 				D8000000000000000000000B /* RNFBDatabaseListenerRegistry.m in Sources */,
 				D80000000000000000000020 /* RNFBDatabaseQueryRegistry.m in Sources */,
+				D80000000000000000000030 /* RNFBSharedUtils.m in Sources */,
+				D80000000000000000000032 /* RNFBDatabaseReferenceHelper.m in Sources */,
+				D80000000000000000000034 /* RNFBDatabaseOnDisconnectHelper.m in Sources */,
+				D80000000000000000000036 /* RNFBDatabaseTransactionHelper.m in Sources */,
 				D8000000000000000000000C /* RNFBDatabaseListenerRegistryTests.m in Sources */,
 				D80000000000000000000022 /* RNFBDatabaseQueryRegistryTests.m in Sources */,
+				D80000000000000000000038 /* RNFBDatabaseNullSentinelDecodeTests.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -182,7 +204,12 @@
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"RNFB_DATABASE_UNIT_TEST=1",
+				);
 				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)",
 					"$(SRCROOT)/../../../app/ios",
 					"$(SRCROOT)/../../../app/ios/RNFBApp",
 					"$(SRCROOT)/../RNFBDatabase",
@@ -216,7 +243,12 @@
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"RNFB_DATABASE_UNIT_TEST=1",
+				);
 				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)",
 					"$(SRCROOT)/../../../app/ios",
 					"$(SRCROOT)/../../../app/ios/RNFBApp",
 					"$(SRCROOT)/../RNFBDatabase",

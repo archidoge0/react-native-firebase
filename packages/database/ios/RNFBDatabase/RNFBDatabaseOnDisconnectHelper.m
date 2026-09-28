@@ -15,6 +15,16 @@
  *
  */
 
+#if RNFB_DATABASE_UNIT_TEST
+
+#import <Foundation/Foundation.h>
+#import "RNFBSharedUtils.h"
+
+@interface RNFBDatabaseOnDisconnectHelper : NSObject
+@end
+
+#else
+
 #if __has_include(<Firebase/Firebase.h>)
 #import <Firebase/Firebase.h>
 #else
@@ -23,10 +33,30 @@
 #endif
 
 #import "RNFBApp/RCTConvert+FIRApp.h"
+#import "RNFBApp/RNFBSharedUtils.h"
 #import "RNFBDatabaseCommon.h"
 #import "RNFBDatabaseOnDisconnectHelper.h"
 
+#endif
+
 @implementation RNFBDatabaseOnDisconnectHelper
+
+/**
+ * Testable seam: decode New Architecture null sentinels before onDisconnect writes.
+ */
++ (id)decodedValueFromProps:(NSDictionary *)props {
+  return [RNFBSharedUtils decodeNullSentinels:[props valueForKey:@"value"]];
+}
+
++ (id)decodedValuesFromProps:(NSDictionary *)props {
+  return [RNFBSharedUtils decodeNullSentinels:[props valueForKey:@"values"]];
+}
+
++ (id)decodedPriorityFromProps:(NSDictionary *)props {
+  return [RNFBSharedUtils decodeNullSentinels:[props valueForKey:@"priority"]];
+}
+
+#if !RNFB_DATABASE_UNIT_TEST
 
 + (void)onDisconnectCancel:(NSString *)app
                      dbURL:(NSString *)dbURL
@@ -79,7 +109,7 @@
   FIRDatabaseReference *firDatabaseReference =
       [RNFBDatabaseCommon getReferenceForDatabase:firDatabase path:path];
 
-  [firDatabaseReference onDisconnectSetValue:[props valueForKey:@"value"]
+  [firDatabaseReference onDisconnectSetValue:[self decodedValueFromProps:props]
                          withCompletionBlock:^(NSError *error, FIRDatabaseReference *ref) {
                            if (error != nil) {
                              [RNFBDatabaseCommon promiseRejectDatabaseException:reject error:error];
@@ -100,8 +130,8 @@
   FIRDatabaseReference *firDatabaseReference =
       [RNFBDatabaseCommon getReferenceForDatabase:firDatabase path:path];
 
-  [firDatabaseReference onDisconnectSetValue:[props valueForKey:@"value"]
-                                 andPriority:[props valueForKey:@"priority"]
+  [firDatabaseReference onDisconnectSetValue:[self decodedValueFromProps:props]
+                                 andPriority:[self decodedPriorityFromProps:props]
                          withCompletionBlock:^(NSError *error, FIRDatabaseReference *ref) {
                            if (error != nil) {
                              [RNFBDatabaseCommon promiseRejectDatabaseException:reject error:error];
@@ -122,7 +152,7 @@
   FIRDatabaseReference *firDatabaseReference =
       [RNFBDatabaseCommon getReferenceForDatabase:firDatabase path:path];
 
-  [firDatabaseReference onDisconnectUpdateChildValues:[props valueForKey:@"values"]
+  [firDatabaseReference onDisconnectUpdateChildValues:[self decodedValuesFromProps:props]
                                   withCompletionBlock:^(NSError *error, FIRDatabaseReference *ref) {
                                     if (error != nil) {
                                       [RNFBDatabaseCommon promiseRejectDatabaseException:reject
@@ -132,5 +162,7 @@
                                     }
                                   }];
 }
+
+#endif
 
 @end

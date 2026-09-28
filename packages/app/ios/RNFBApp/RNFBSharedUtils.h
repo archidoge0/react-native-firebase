@@ -18,6 +18,16 @@
 #ifndef RNFBSharedUtils_h
 #define RNFBSharedUtils_h
 
+#if RNFB_DATABASE_UNIT_TEST
+
+#import <Foundation/Foundation.h>
+
+@interface RNFBSharedUtils : NSObject
++ (id)decodeNullSentinels:(id)value;
+@end
+
+#else
+
 #if __has_include(<FirebaseCore/FirebaseCore.h>)
 #import <FirebaseCore/FirebaseCore.h>
 #else
@@ -67,5 +77,7 @@ extern NSString *const DEFAULT_APP_NAME;
 + (id)decodeNullSentinels:(id)value;
 
 @end
+
+#endif
 
 #endif
