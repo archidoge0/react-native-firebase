@@ -16,7 +16,7 @@
  */
 
 #import "RNFBSharedUtils.h"
-#if !RNFB_DATABASE_UNIT_TEST
+#if !RNFB_DATABASE_UNIT_TEST && !RNFB_UNIT_TEST
 #import "RNFBAppModule.h"
 #import "RNFBJSON.h"
 #import "RNFBMeta.h"
@@ -32,7 +32,7 @@ NSString *const DEFAULT_APP_NAME = @"__FIRAPP_DEFAULT";
 
 @implementation RNFBSharedUtils
 
-#if !RNFB_DATABASE_UNIT_TEST
+#if !RNFB_DATABASE_UNIT_TEST && !RNFB_UNIT_TEST
 
 static NSString *const RNFBErrorDomain = @"RNFBErrorDomain";
 

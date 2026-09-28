@@ -15,6 +15,16 @@
  *
  */
 
+#if RNFB_AUTH_UNIT_TEST
+
+#import <Foundation/Foundation.h>
+#import "RNFBSharedUtils.h"
+
+@interface RNFBAuthHelper : NSObject
+@end
+
+#else
+
 #if __has_include(<Firebase/Firebase.h>)
 #import <Firebase/Firebase.h>
 #else
@@ -209,7 +219,20 @@ static __strong RNFBAuthCacheRegistry *cachedTotpSecrets;
 
 @end
 
+#endif
+
 @implementation RNFBAuthHelper
+
+/**
+ * Testable seam: decode New Architecture null sentinels before profileChangeRequest writes.
+ * displayName/photoURL null arrive as props[key] = { __rnfbNull: true }.
+ */
++ (NSDictionary *)decodedProfileProps:(NSDictionary *)props {
+  return [RNFBSharedUtils decodeNullSentinels:props];
+}
+
+#if !RNFB_AUTH_UNIT_TEST
+
 
 #pragma mark -
 #pragma mark Shared state
@@ -652,15 +675,20 @@ static __strong RNFBAuthCacheRegistry *cachedTotpSecrets;
 
   if (user) {
     FIRUserProfileChangeRequest *changeRequest = [user profileChangeRequest];
-    NSMutableArray *allKeys = [[props allKeys] mutableCopy];
+    NSDictionary *decodedProps = [self decodedProfileProps:props];
+    NSMutableArray *allKeys = [[decodedProps allKeys] mutableCopy];
 
     for (NSString *key in allKeys) {
       @try {
+        id value = decodedProps[key];
+        if (value == [NSNull null]) {
+          value = nil;
+        }
         if ([key isEqualToString:keyPhotoUrl]) {
-          NSURL *url = [NSURL URLWithString:[props valueForKey:key]];
+          NSURL *url = value == nil ? nil : [NSURL URLWithString:value];
           [changeRequest setValue:url forKey:key];
         } else {
-          [changeRequest setValue:props[key] forKey:key];
+          [changeRequest setValue:value forKey:key];
         }
       } @catch (NSException *exception) {
         DLog(@"Exception occurred while configuring: %@", exception);
@@ -2217,5 +2245,7 @@ static __strong RNFBAuthCacheRegistry *cachedTotpSecrets;
 
   return settings;
 }
+
+#endif
 
 @end

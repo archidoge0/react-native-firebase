@@ -15,6 +15,16 @@
  *
  */
 
+#if RNFB_CONFIG_UNIT_TEST
+
+#import <Foundation/Foundation.h>
+#import "RNFBSharedUtils.h"
+
+@interface RNFBConfigHelper : NSObject
+@end
+
+#else
+
 #if __has_include(<Firebase/Firebase.h>)
 #import <Firebase/Firebase.h>
 #else
@@ -97,7 +107,19 @@ static FIRApp *firebaseAppForName(NSString *appName) {
   return [RCTConvert firAppFromString:appName];
 }
 
+#endif
+
 @implementation RNFBConfigHelper
+
+/**
+ * Testable seam: decode New Architecture null sentinels before FIRRemoteConfig setDefaults.
+ */
++ (NSDictionary *)decodedDefaults:(NSDictionary *)defaults {
+  return [RNFBSharedUtils decodeNullSentinels:defaults];
+}
+
+#if !RNFB_CONFIG_UNIT_TEST
+
 
 + (void)initializeConfigUpdateHandlersOnce {
   static dispatch_once_t onceToken;
@@ -290,7 +312,8 @@ static FIRApp *firebaseAppForName(NSString *appName) {
             resolve:(RCTPromiseResolveBlock)resolve
              reject:(RCTPromiseRejectBlock)reject {
   FIRApp *firebaseApp = firebaseAppForName(appName);
-  [[FIRRemoteConfig remoteConfigWithApp:firebaseApp] setDefaults:defaults];
+  NSDictionary *decodedDefaults = [self decodedDefaults:defaults];
+  [[FIRRemoteConfig remoteConfigWithApp:firebaseApp] setDefaults:decodedDefaults];
   resolve([self resultWithConstants:[NSNull null] firebaseApp:firebaseApp]);
 }
 
@@ -385,5 +408,7 @@ static FIRApp *firebaseAppForName(NSString *appName) {
           }
         }];
 }
+
+#endif
 
 @end

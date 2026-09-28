@@ -18,7 +18,7 @@
 #ifndef RNFBSharedUtils_h
 #define RNFBSharedUtils_h
 
-#if RNFB_DATABASE_UNIT_TEST
+#if RNFB_DATABASE_UNIT_TEST || RNFB_UNIT_TEST
 
 #import <Foundation/Foundation.h>
 

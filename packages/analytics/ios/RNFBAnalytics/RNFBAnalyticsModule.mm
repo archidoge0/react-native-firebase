@@ -38,6 +38,7 @@
 #import "RNFBAnalytics-Swift.h"
 #endif
 #import <RNFBApp/RNFBSharedUtils.h>
+#import "RNFBAnalyticsHelper.h"
 #import "RNFBAnalyticsModule.h"
 
 /** GA4 parameters that must be sent as integer NSNumber values (not doubles from JS). */
@@ -121,7 +122,8 @@ RCT_EXPORT_MODULE(NativeRNFBTurboAnalytics)
          resolve:(RCTPromiseResolveBlock)resolve
           reject:(RCTPromiseRejectBlock)reject {
   @try {
-    [FIRAnalytics logEventWithName:name parameters:[self cleanJavascriptParams:params]];
+    NSDictionary *decoded = [RNFBAnalyticsHelper decodedParams:params];
+    [FIRAnalytics logEventWithName:name parameters:[self cleanJavascriptParams:decoded]];
   } @catch (NSException *exception) {
     return [RNFBSharedUtils rejectPromiseWithExceptionDict:reject exception:exception];
   }
@@ -168,7 +170,8 @@ RCT_EXPORT_MODULE(NativeRNFBTurboAnalytics)
                   resolve:(RCTPromiseResolveBlock)resolve
                    reject:(RCTPromiseRejectBlock)reject {
   @try {
-    [properties enumerateKeysAndObjectsUsingBlock:^(id key, id value, BOOL *stop) {
+    NSDictionary *decoded = [RNFBAnalyticsHelper decodedParams:properties];
+    [decoded enumerateKeysAndObjectsUsingBlock:^(id key, id value, BOOL *stop) {
       [FIRAnalytics setUserPropertyString:[self convertNSNullToNil:value] forName:key];
     }];
   } @catch (NSException *exception) {
@@ -240,7 +243,8 @@ RCT_EXPORT_MODULE(NativeRNFBTurboAnalytics)
                           resolve:(RCTPromiseResolveBlock)resolve
                            reject:(RCTPromiseRejectBlock)reject {
   @try {
-    [FIRAnalytics setDefaultEventParameters:[self cleanJavascriptParams:params]];
+    NSDictionary *decoded = [RNFBAnalyticsHelper decodedParams:params];
+    [FIRAnalytics setDefaultEventParameters:[self cleanJavascriptParams:decoded]];
   } @catch (NSException *exception) {
     return [RNFBSharedUtils rejectPromiseWithExceptionDict:reject exception:exception];
   }
