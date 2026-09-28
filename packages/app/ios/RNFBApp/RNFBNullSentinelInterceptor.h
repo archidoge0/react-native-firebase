@@ -40,7 +40,7 @@
  * This swizzles RCTCxxConvert (TurboModule converter) to automatically decode null sentinels.
  * Called automatically when the class is loaded via +load.
  */
-+ (void)initialize;
++ (void)load;
 
 @end
 

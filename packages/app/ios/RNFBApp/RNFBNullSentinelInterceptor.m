@@ -51,7 +51,6 @@
     if ([selectorName hasPrefix:@"JS_NativeRNFBTurbo"] && [selectorName containsString:@"_Spec"]) {
       // Create a swizzled version using IMP
       IMP originalIMP = method_getImplementation(method);
-      const char *typeEncoding = method_getTypeEncoding(method);
 
       // Replace with our wrapper that decodes nulls
       IMP newIMP = imp_implementationWithBlock(^id(id self, id json) {
