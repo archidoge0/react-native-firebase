@@ -168,6 +168,15 @@ Local e2e (`yarn tests:*:test-cover`), the packager, emulator start, native buil
 - There is **no** `yarn google-java-format` script. Invented `google-java-format` / `npx google-java-format` invocations are forbidden.
 - **Canonical:** `yarn lint:android` (repo root) — wraps `google-java-format --set-exit-if-changed --replace` on `packages/*/android/src` and fails if the tree would change.
 
+### Detox `CC=clang` / `LD=clang` breaks iOS SPM Swift link (Xcode 26)
+
+<a id="detox-cc-clang-spm-swift-link-xcode-26"></a>
+
+- `tests/.detoxrc.js` `ios.debug` / `ios.release` build lines must not pass `CC=clang CPLUSPLUS=clang++ LD=clang LDPLUSPLUS=clang++` into `xcodebuild`. Those overrides were removed: on **Xcode 26** they make Swift SPM **library-emit** fail with `unknown -sdk` / `-Xclang-linker` (host `clang` is not Apple's driver for that path).
+- Do not add them back. Canonical remains `yarn tests:ios:build` after [pod install + fmt gate](#install-patch-fmt-gate-blocking).
+- **Distinct** from the Expo documented-path closer: `.github/workflows/scripts/test-expo-ios-link.sh` prefers a simulator **destination** over bare `-sdk iphonesimulator` for arch selection. That script does **not** set `CC`/`LD`, and this Detox failure is **not** that gotcha.
+- Do **not** invent an alternate Detox/`xcodebuild` invocation, swap in `yarn test-expo:ios-link`, or disable SPM to prove the build.
+
 ### Android build / unit / Jacoco
 
 - **Do not** invent `cd tests && yarn install`, then bare `./gradlew` from an arbitrary cwd.
@@ -246,6 +255,7 @@ RN CLI prebuilt RNCore iOS build (not Detox): yarn test-rn-bare:ios:build ONLY �
 Never react-native init / npx @react-native-community/cli init — @react-native-community/template is not installed by root yarn; one-shot pin + copy ios/ + JS, then remove pin — #react-native-community-template-checked-in-rn-cli-ios.
 Never: yarn workspace prepare, yarn jet, npx jet, cd packages/* && yarn prepare/build for diagnostics.
 Never invent format/install: yarn google-java-format, bare/npx google-java-format, npm install, yarn install in tests/ alone — use root yarn first; Java format = yarn lint:android ONLY.
+Detox iOS :build Xcode 26 Swift SPM library-emit unknown -sdk / -Xclang-linker if CC=clang LD=clang is put back on tests/.detoxrc.js ios debug/release (overrides removed; not the test-expo-ios-link.sh destination gotcha) — #detox-cc-clang-spm-swift-link-xcode-26.
 Never invent Android Gradle: ad-hoc ./gradlew outside yarn tests:android:unit / :build / :post-e2e-coverage / :test:jacoco-report; bare detox/jet/metro.
 Prepare/install: yarn or yarn lerna:prepare must exit 0 before ANY other command — never parallelize with e2e/Metro/build.
 Before native :build: root yarn exit 0 + verify tests/node_modules/react-native/third-party-podspecs/fmt.podspec (and tests-macos copy when building macOS) ≥ 12.1.0 — okf-bundle/testing/agent-command-policy.md#install-patch-fmt-gate-blocking. Before iOS build on a clean checkout: root yarn, then yarn tests:ios:pod:install exit 0. If fmt < 12.1.0: STOP and re-run yarn; never invent Podfile/FMT_USE_CONSTEVAL/c++17 fmt hacks.
