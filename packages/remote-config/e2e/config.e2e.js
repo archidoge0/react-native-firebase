@@ -436,6 +436,21 @@ describe('remoteConfig()', function () {
       });
     });
 
+    describe('setDefaults()', function () {
+      if (Platform.other) {
+        // Not supported on Web.
+        return;
+      }
+
+      it('resolves with defaults including a null value', async function () {
+        const { getRemoteConfig } = remoteConfigModular;
+        await getRemoteConfig().setDefaults({
+          some_key: 'setDefaults_e2e',
+          null_default: null,
+        });
+      });
+    });
+
     describe('reset()', function () {
       it('resets all activated, fetched and default config on supported SDKs', async function () {
         const { getRemoteConfig, getAll, reset } = remoteConfigModular;

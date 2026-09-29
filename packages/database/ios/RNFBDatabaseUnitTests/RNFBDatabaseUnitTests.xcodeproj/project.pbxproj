@@ -131,7 +131,7 @@
 				Base,
 			);
 			mainGroup = D80000000000000000000004;
-			productRefGroup = D80000000000000000005 /* Products */;
+			productRefGroup = D80000000000000000000005 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
