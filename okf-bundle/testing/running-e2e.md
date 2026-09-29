@@ -658,6 +658,8 @@ Pass counts in the **thousands** or unrelated suites (`database`, `crashlytics`,
 
 **Area example:** `modules: ['app', 'firestore']` + full firestore specs via existing `require.context`.
 
+`modules` filters the strings pushed onto `platformSupportedModules` in `tests/app.js` — those ids are not always the package directory. `remoteConfig` loads `packages/remote-config/e2e`; `remote-config` loads nothing (`firestore` happens to match both). Example that works: `modules: ['app', 'remoteConfig']`.
+
 Package-specific spec names: [Firestore pipeline harness](../packages/firestore/pipeline-implementation-workflow.md#pipeline-area-harness). Area narrowing otherwise: [§ local harness overrides](#local-harness-overrides-harnessoverridesjs).
 
 <a id="fail-fast-rnfbdebug-and-sub-suite-narrowing"></a>
