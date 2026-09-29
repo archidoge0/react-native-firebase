@@ -147,6 +147,10 @@ module Xcodeproj
         end
       end
 
+      class XCLocalSwiftPackageReference < XCRemoteSwiftPackageReference
+        attr_accessor :relative_path
+      end
+
       class XCSwiftPackageProductDependency
         attr_reader :package
         attr_accessor :product_name
@@ -380,6 +384,7 @@ class FirebaseSpmTest < Minitest::Test
     # than relying on `defined?` alone) is exactly the behavior rnfirebase_spm_disabled?
     # is meant to guard against, so tests below assert on it explicitly.
     $RNFirebaseDisableSPM = nil
+    ENV.delete('RNFB_TEST_RN_BARE_DYNAMIC_FIREBASE')
     # `RNFirebaseSPM` gives us a real, deliberate reset primitive for the SPM
     # active/version/url state instead of relying on that same one-way-`defined?`
     # workaround -- unlike a bare global, `reset!` can put it back to a genuinely
@@ -507,6 +512,62 @@ class FirebaseSpmTest < Minitest::Test
     # SPM called with only the SPM products (no FirebaseCoreExtension)
     assert_equal 1, spm_calls.length
     assert_equal ['FirebaseCrashlytics'], spm_calls[0][:products]
+  end
+
+  def test_probe_dynamic_firebase_uses_local_umbrella_product_only
+    spm_calls = []
+    Object.define_method(:spm_dependency) do |spec, **kwargs|
+      spm_calls << { spec: spec, **kwargs }
+    end
+
+    ENV['RNFB_TEST_RN_BARE_DYNAMIC_FIREBASE'] = '1'
+    load_firebase_spm
+
+    spec = MockSpec.new
+    firebase_dependency(spec, '12.10.0', %w[FirebaseCore FirebaseInstallations], 'Firebase/CoreOnly')
+
+    assert_empty spec.dependencies
+    assert RNFirebaseSPM.active?
+    assert RNFirebaseSPM.umbrella?
+    assert_equal 1, spm_calls.length
+    assert_equal RNFirebaseSPM.umbrella_path, spm_calls[0][:url]
+    assert_equal [RNFIREBASE_SPM_UMBRELLA_PRODUCT], spm_calls[0][:products]
+  end
+
+  def test_probe_dynamic_firebase_flag_off_keeps_remote_products
+    spm_calls = []
+    Object.define_method(:spm_dependency) do |spec, **kwargs|
+      spm_calls << { spec: spec, **kwargs }
+    end
+
+    ENV['RNFB_TEST_RN_BARE_DYNAMIC_FIREBASE'] = '0'
+    load_firebase_spm
+
+    spec = MockSpec.new
+    firebase_dependency(spec, '12.10.0', %w[FirebaseCore FirebaseInstallations], 'Firebase/CoreOnly')
+
+    assert_equal 1, spm_calls.length
+    assert_equal RNFirebaseSPM.url, spm_calls[0][:url]
+    assert_equal %w[FirebaseCore FirebaseInstallations], spm_calls[0][:products]
+    refute RNFirebaseSPM.umbrella?
+  end
+
+  def test_add_core_links_local_umbrella_when_probe_active
+    load_firebase_spm
+    RNFirebaseSPM.activate!('12.10.0', mode: :umbrella)
+
+    target = MockTarget.new(['[CP] Embed Pods Frameworks'])
+    user_project = MockUserProject.new([target])
+    installer = MockInstaller.new([MockAggregateTarget.new(user_project)])
+
+    rnfirebase_add_spm_core_to_app_target(installer)
+
+    assert_equal 1, target.package_product_dependencies.length
+    ref = target.package_product_dependencies[0]
+    assert_equal RNFIREBASE_SPM_UMBRELLA_PRODUCT, ref.product_name
+    assert_equal RNFirebaseSPM.umbrella_path, ref.package.relative_path
+    assert_equal 1, target.frameworks_build_phase.files.length
+    assert_equal 1, user_project.save_count
   end
 
   # ── $RNFirebaseDisableSPM semantics (must check truthiness, not defined?) ──
@@ -1121,13 +1182,14 @@ class FirebaseSpmTest < Minitest::Test
   #    see "redefinition of module 'Firebase'" / duplicate App-Intents-metadata
   #    build commands) ──
 
-  def test_remove_core_noop_when_spm_active
+  def test_remove_core_noop_when_spm_active_and_no_stale_probe_link
     load_firebase_spm
-    RNFirebaseSPM.activate!('12.10.0')
+    RNFirebaseSPM.activate!('12.10.0', mode: :remote)
 
-    installer = MockInstaller.new(nil) # would raise if ever touched
+    # Remote SPM still walks targets to drop a leftover local probe link, but
+    # with an empty aggregate list there is nothing to touch.
+    installer = MockInstaller.new([])
     rnfirebase_remove_spm_core_from_app_target(installer)
-    # No error raised => returned early without walking `installer.aggregate_targets`.
   end
 
   def test_remove_core_noop_when_no_stale_dependency_present

@@ -15,6 +15,11 @@
  */
 
 import Foundation
+#if canImport(RNFBFirebase)
+import RNFBFirebase
+#else
+import FirebaseCore
+#endif
 
 /**
  * Mutable FIROptions fields set by `convertRawOptions`.
@@ -52,6 +57,91 @@ import Foundation
 }
 
 /**
+ * Wraps live `FirebaseOptions` for `RNFBFIROptionsConfiguring`.
+ *
+ * Swift overlays rename / tighten optionality (`apiKey`, non-optional `bundleID`),
+ * so a direct `extension FirebaseOptions: RNFBFIROptionsConfiguring` does not compile.
+ */
+@objc(RNFBFIROptionsConfiguringAdapter)
+final class RNFBFIROptionsConfiguringAdapter: NSObject, RNFBFIROptionsConfiguring {
+  @objc let options: FirebaseOptions
+
+  init(_ options: FirebaseOptions) {
+    self.options = options
+  }
+
+  var APIKey: String? {
+    get { options.apiKey }
+    set { options.apiKey = newValue }
+  }
+
+  var projectID: String? {
+    get { options.projectID }
+    set { options.projectID = newValue }
+  }
+
+  var clientID: String? {
+    get { options.clientID }
+    set { options.clientID = newValue }
+  }
+
+  var databaseURL: String? {
+    get { options.databaseURL }
+    set { options.databaseURL = newValue }
+  }
+
+  var storageBucket: String? {
+    get { options.storageBucket }
+    set { options.storageBucket = newValue }
+  }
+
+  var bundleID: String? {
+    get { options.bundleID }
+    set { options.bundleID = newValue ?? "" }
+  }
+
+  var appGroupID: String? {
+    get { options.appGroupID }
+    set { options.appGroupID = newValue }
+  }
+}
+
+/**
+ * Adapts `FirebaseOptions` / `FIROptions` for `RCTConvertFIROptions`.
+ */
+@objc(RNFBFIROptionsFactoryAdapter)
+final class RNFBFIROptionsFactoryAdapter: NSObject, RNFBFIROptionsCreating {
+  @objc static let shared = RNFBFIROptionsFactoryAdapter()
+
+  @objc(createWithGoogleAppID:gcmSenderID:)
+  func create(googleAppID: String?, gcmSenderID: String?) -> RNFBFIROptionsConfiguring {
+    // Pre-port forwarded nil into `initWithGoogleAppID:GCMSenderID:`. The Swift
+    // `FirebaseOptions(googleAppID:gcmSenderID:)` overlay requires non-optional String,
+    // so call the ObjC initializer directly to preserve nil.
+    let allocated = FirebaseOptions.perform(NSSelectorFromString("alloc"))!
+      .takeUnretainedValue() as! NSObject
+    let initialized = allocated.perform(
+      NSSelectorFromString("initWithGoogleAppID:GCMSenderID:"),
+      with: googleAppID,
+      with: gcmSenderID
+    )!.takeUnretainedValue() as! FirebaseOptions
+    return RNFBFIROptionsConfiguringAdapter(initialized)
+  }
+}
+
+/**
+ * Adapts mainBundle CFBundleIdentifier for `RCTConvertFIROptions`.
+ */
+@objc(RNFBMainBundleIdentifierProvider)
+final class RNFBMainBundleIdentifierProvider: NSObject, RNFBBundleIdentifierProviding {
+  @objc static let shared = RNFBMainBundleIdentifierProvider()
+
+  @objc var bundleIdentifier: String? {
+    Bundle.main.object(forInfoDictionaryKey: "CFBundleIdentifier") as? String
+  }
+}
+
+/**
  * Raw JS options dict → FIROptions mapping previously inline in `RCTConvert+FIROptions.m`.
  *
  * Mirrors pre-port:
@@ -61,6 +151,25 @@ import Foundation
  */
 @objc(RCTConvertFIROptions)
 public final class RCTConvertFIROptions: NSObject {
+  /// Unwraps a configuring adapter to the live `FIROptions` object.
+  static func liveFIROptions(from configured: RNFBFIROptionsConfiguring) -> AnyObject {
+    if let adapter = configured as? RNFBFIROptionsConfiguringAdapter {
+      return adapter.options
+    }
+    return configured
+  }
+
+  /// Production entry used by `RCTConvert+FIROptions.m` — returns live `FIROptions`.
+  @objc(convertRawOptions:)
+  public static func convertRawOptions(_ rawOptions: NSDictionary) -> AnyObject {
+    let configured = convertRawOptions(
+      rawOptions,
+      optionsFactory: RNFBFIROptionsFactoryAdapter.shared,
+      bundleIDProvider: RNFBMainBundleIdentifierProvider.shared
+    )
+    return liveFIROptions(from: configured)
+  }
+
   @objc(convertRawOptions:optionsFactory:bundleIDProvider:)
   public static func convertRawOptions(
     _ rawOptions: NSDictionary,

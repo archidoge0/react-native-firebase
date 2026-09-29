@@ -14,6 +14,10 @@
 #   - Expo documented-path link / duplicate Firebase symbols:
 #     yarn test-expo:ios:link (GitHub #9158 / #9202)
 #
+# Optional CI probe (off by default): RNFB_TEST_RN_BARE_DYNAMIC_FIREBASE=1
+# links App through the local dynamic package at
+# packages/app/ios/RNFBFirebase instead of direct firebase-ios-sdk.
+#
 # Historical #8883 compile signatures to stay past:
 #   'React/RCTConvert.h' file not found
 #   'React/RCTBridgeModule.h' file not found
@@ -29,11 +33,14 @@ log() {
 
 POD_INSTALL_LOG="${RNFB_TEST_RN_BARE_POD_LOG:-/tmp/test-rn-bare-pod-install.log}"
 XCODEBUILD_LOG="${RNFB_TEST_RN_BARE_XCODEBUILD_LOG:-/tmp/test-rn-bare-xcodebuild.log}"
+DERIVED_DATA="${RNFB_TEST_RN_BARE_DERIVED_DATA:-/tmp/test-rn-bare-derived-data}"
 PODFILE="test-rn-bare/ios/Podfile"
 PBXPROJ="test-rn-bare/ios/testrnbare.xcodeproj/project.pbxproj"
 PODFILE_LOCK="test-rn-bare/ios/Podfile.lock"
 WORKSPACE="${RNFB_TEST_RN_BARE_WORKSPACE:-test-rn-bare/ios/testrnbare.xcworkspace}"
 SCHEME="${RNFB_TEST_RN_BARE_SCHEME:-testrnbare}"
+# Default off: shipped path keeps spm_dependency on firebase-ios-sdk.
+PROBE_DYNAMIC_FIREBASE="${RNFB_TEST_RN_BARE_DYNAMIC_FIREBASE:-0}"
 
 fail() {
   log "ERROR: $*"
@@ -65,6 +72,19 @@ assert_podfile_fail_closed() {
   log "Podfile: prebuilt RNCore not forced off, no RNFB static pre_install, SPM + dynamic present"
 }
 
+assert_app_no_firebase_core_objc_import() {
+  log "--- App ObjC FirebaseCore import check (probe) ---"
+  local hits
+  hits="$(grep -R -n -E '@import[[:space:]]+FirebaseCore|#import[[:space:]]+<FirebaseCore' \
+    packages/app/ios/RNFBApp --include='*.h' --include='*.m' --include='*.mm' || true)"
+  if [[ -n "$hits" ]]; then
+    log "App ObjC still imports FirebaseCore:"
+    echo "$hits"
+    fail "App still needs @import / #import FirebaseCore; move FIRApp/FIROptions calls to Swift first"
+  fi
+  log "App ObjC sources do not import FirebaseCore"
+}
+
 assert_generated_graph() {
   log "--- generated graph checks ---"
   if ! grep -q 'React-Core-prebuilt' "$PODFILE_LOCK"; then
@@ -73,18 +93,73 @@ assert_generated_graph() {
   if ! grep -q 'Building from source: false' "$POD_INSTALL_LOG"; then
     fail "pod install log does not show 'Building from source: false' (prebuilt RNCore not engaged)"
   fi
-  if ! grep -q 'Using SPM for Firebase dependency resolution' "$POD_INSTALL_LOG"; then
-    fail "pod install log is missing 'Using SPM for Firebase dependency resolution'"
+  if [[ "$PROBE_DYNAMIC_FIREBASE" == "1" ]]; then
+    if ! grep -q 'Using local RNFBFirebase SPM probe' "$POD_INSTALL_LOG"; then
+      fail "probe flag is on but pod install log is missing 'Using local RNFBFirebase SPM probe'"
+    fi
+    if grep -q 'Using SPM for Firebase dependency resolution (products:' "$POD_INSTALL_LOG"; then
+      fail "probe flag is on but pod install still logged direct firebase-ios-sdk SPM products"
+    fi
+  else
+    if ! grep -q 'Using SPM for Firebase dependency resolution' "$POD_INSTALL_LOG"; then
+      fail "pod install log is missing 'Using SPM for Firebase dependency resolution'"
+    fi
+    if grep -q 'Using local RNFBFirebase SPM probe' "$POD_INSTALL_LOG"; then
+      fail "probe flag is off but pod install logged the local RNFBFirebase probe path"
+    fi
   fi
   if [[ -f "$PBXPROJ" ]] && grep -q 'packageProductDependencies' "$PBXPROJ"; then
     log "app pbxproj HAS packageProductDependencies (SPM products linked)"
   else
     log "app pbxproj packageProductDependencies not found (CocoaPods may keep them on the Pods project); SPM log line was present"
   fi
-  log "generated graph: prebuilt RNCore on, Firebase SPM on"
+  log "generated graph: prebuilt RNCore on, Firebase SPM on (probe=${PROBE_DYNAMIC_FIREBASE})"
+}
+
+assert_dynamic_firebase_probe_graph() {
+  local products_dir="${DERIVED_DATA}/Build/Products/Release-iphonesimulator"
+  local umbrella_binary
+  local app_binary
+  local framework_binary
+  local defined_symbols
+
+  log "--- dynamic RNFBFirebase probe graph checks ---"
+
+  umbrella_binary="$(find "$products_dir" -type f -path '*/RNFBFirebase.framework/RNFBFirebase' -print -quit)"
+  [[ -n "$umbrella_binary" ]] || fail "RNFBFirebase dynamic framework binary was not produced"
+  file -b "$umbrella_binary" | grep -q 'dynamically linked' ||
+    fail "RNFBFirebase product is not a dynamically linked framework"
+
+  app_binary="$(find "$products_dir" -type f -path '*/testrnbare.app/testrnbare' -print -quit)"
+  [[ -n "$app_binary" ]] || fail "testrnbare app binary was not found under ${products_dir}"
+  otool -L "$app_binary" | grep -Fq '@rpath/RNFBFirebase.framework/RNFBFirebase' ||
+    fail "app binary does not link RNFBFirebase"
+
+  framework_binary="$(find "$products_dir" -type f -path '*/RNFBApp.framework/RNFBApp' -print -quit)"
+  [[ -n "$framework_binary" ]] || fail "RNFBApp framework binary was not found"
+  otool -L "$framework_binary" | grep -Fq '@rpath/RNFBFirebase.framework/RNFBFirebase' ||
+    fail "RNFBApp does not link the RNFBFirebase probe package"
+  # Match the ObjC class symbol for Firebase's FIRApp only — not Swift mangled
+  # names that happen to contain "FIRApp" (RNFBFIRAppLifecycle, RCTConvertFIRApp, …).
+  defined_symbols="$(nm -gU "$framework_binary" || true)"
+  if grep -E -q '[[:space:]]_OBJC_CLASS_\$_FIRApp$|[[:space:]]_OBJC_METACLASS_\$_FIRApp$' <<<"$defined_symbols"; then
+    log "RNFBApp still defines FIRApp class symbols:"
+    grep -E '[[:space:]]_OBJC_CLASS_\$_FIRApp$|[[:space:]]_OBJC_METACLASS_\$_FIRApp$' <<<"$defined_symbols" || true
+    fail "nm found FIRApp defined inside RNFBApp.framework"
+  fi
+  log "nm: no _OBJC_CLASS_\$_FIRApp in RNFBApp.framework; RNFBFirebase linked"
 }
 
 assert_podfile_fail_closed
+
+if [[ "$PROBE_DYNAMIC_FIREBASE" == "1" ]]; then
+  export RNFB_TEST_RN_BARE_DYNAMIC_FIREBASE=1
+  assert_app_no_firebase_core_objc_import
+  log "probe mode ON (RNFB_TEST_RN_BARE_DYNAMIC_FIREBASE=1)"
+else
+  unset RNFB_TEST_RN_BARE_DYNAMIC_FIREBASE || true
+  log "probe mode OFF (direct firebase-ios-sdk)"
+fi
 
 log "pod install (log: ${POD_INSTALL_LOG})"
 (
@@ -109,9 +184,10 @@ xcodebuild_args=(
   ARCHS="${HOST_ARCH}"
   VALID_ARCHS="${HOST_ARCH}"
   ONLY_ACTIVE_ARCH=YES
-  CC=clang CPLUSPLUS=clang++ LD=clang LDPLUSPLUS=clang++
+  CC=clang CPLUSPLUS=clang++
   -workspace "$WORKSPACE"
   -scheme "$SCHEME"
+  -derivedDataPath "$DERIVED_DATA"
   -configuration Release
   -destination 'generic/platform=iOS Simulator'
   CODE_SIGNING_ALLOWED=NO
@@ -165,4 +241,9 @@ if grep -q "duplicate symbol '_FIRFirebaseVersion'" "$XCODEBUILD_LOG"; then
   fail "xcodebuild passed but an Expo duplicate-Firebase signature remains; that is not this closer"
 fi
 
-log "PASS: vanilla RN CLI documented path compiles with prebuilt RNCore on, no RNFB static pre_install, SPM + dynamic, without #8883 compile signatures"
+if [[ "$PROBE_DYNAMIC_FIREBASE" == "1" ]]; then
+  assert_dynamic_firebase_probe_graph
+  log "PASS: probe links App through local dynamic RNFBFirebase (FirebaseCore + FirebaseInstallations), nm clean"
+else
+  log "PASS: vanilla RN CLI documented path compiles with prebuilt RNCore on, no RNFB static pre_install, SPM + dynamic, without #8883 compile signatures"
+fi

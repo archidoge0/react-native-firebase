@@ -12,13 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
-#import <React/RCTConvert.h>
+@_exported import FirebaseCore
+@_exported import FirebaseInstallations
 
-@class FIROptions;
-
-@interface RCTConvert (FIROptions)
-+ (FIROptions *)convertRawOptions:(NSDictionary *)rawOptions;
-@end
+/// Marker type for the local dynamic Firebase probe product (`RNFBFirebase`).
+public enum RNFBFirebaseUmbrella {}

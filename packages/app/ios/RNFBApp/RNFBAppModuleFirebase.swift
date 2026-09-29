@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
+#if canImport(RNFBFirebase)
+import RNFBFirebase
+#else
 import FirebaseCore
+#endif
 import Foundation
 
 /**
@@ -86,8 +90,8 @@ final class RNFBAppModuleFIROptionsFactory: NSObject, RNFBFIROptionsCreating {
       NSSelectorFromString("initWithGoogleAppID:GCMSenderID:"),
       with: googleAppID,
       with: gcmSenderID
-    )!.takeUnretainedValue()
-    return initialized as! RNFBFIROptionsConfiguring
+    )!.takeUnretainedValue() as! FirebaseOptions
+    return RNFBFIROptionsConfiguringAdapter(initialized)
   }
 }
 
@@ -260,7 +264,14 @@ public final class RNFBAppModuleFirebase: NSObject {
     nameResolution: RNFBAppInitializeNameResolution,
     lifecycle: RNFBFIRAppLifecycle
   ) -> AnyObject {
-    let firOptions = options as AnyObject
+    // Production factories wrap live `FirebaseOptions` in
+    // `RNFBFIROptionsConfiguringAdapter`. Configure needs the underlying SDK object.
+    let firOptions: AnyObject
+    if let adapter = options as? RNFBFIROptionsConfiguringAdapter {
+      firOptions = adapter.options
+    } else {
+      firOptions = options
+    }
     if nameResolution.isDefaultApp {
       if let existing = lifecycle.defaultApp() {
         return existing

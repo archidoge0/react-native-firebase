@@ -28,7 +28,10 @@ Pod::Spec.new do |s|
   s.private_header_files = "ios/**/*.h"
   # CocoaPods FileList uses FNM_PATHNAME: `ios/*UnitTests/**` does not match nested
   # paths like `ios/RNFBAppUnitTests/HostStubs/**` (those would compile into the pod).
-  s.exclude_files       = 'ios/generated/RCTThirdPartyComponentsProvider.*', 'ios/generated/RCTAppDependencyProvider.*', 'ios/generated/RCTModuleProviders.*', 'ios/generated/RCTModulesConformingToProtocolsProvider.*', 'ios/generated/RCTUnstableModulesRequiringMainQueueSetupProvider.*', 'ios/*UnitTests/**/*'
+  # CocoaPods FileList uses FNM_PATHNAME: a trailing `/**` alone does not match
+  # nested files (same reason UnitTests use `/**/*`). Exclude the CI-only local
+  # SPM package so its sources are never compiled into the RNFBApp pod.
+  s.exclude_files       = 'ios/generated/RCTThirdPartyComponentsProvider.*', 'ios/generated/RCTAppDependencyProvider.*', 'ios/generated/RCTModuleProviders.*', 'ios/generated/RCTModulesConformingToProtocolsProvider.*', 'ios/generated/RCTUnstableModulesRequiringMainQueueSetupProvider.*', 'ios/*UnitTests/**/*', 'ios/RNFBFirebase/**/*'
 
   # Fail fast for old architecture users, but safely in case the variable goes away
   # completely in future react-native versions

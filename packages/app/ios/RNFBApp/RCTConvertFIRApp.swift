@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
+#if canImport(RNFBFirebase)
+import RNFBFirebase
+#else
 import FirebaseCore
+#endif
 import Foundation
 
 /**

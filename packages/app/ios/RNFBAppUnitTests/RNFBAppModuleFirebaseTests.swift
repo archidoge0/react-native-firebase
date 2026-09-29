@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import FirebaseCore
 import Foundation
 import XCTest
 
@@ -178,6 +179,25 @@ final class RNFBAppModuleFirebaseTests: XCTestCase {
 
     XCTAssertEqual(lifecycle.lastConfigureName, "secondary")
     XCTAssertTrue(result === lifecycle.namedApps["secondary"])
+  }
+
+  func testConfigureOrReuseUnwrapsConfiguringAdapterToLiveOptions() {
+    let lifecycle = StubFIRAppLifecycle()
+    let names = RNFBAppInitializeNameResolution(
+      appName: "secondary",
+      jsAppName: "secondary",
+      isDefaultApp: false
+    )
+    let live = FirebaseOptions(googleAppID: "app-id", gcmSenderID: "sender-id")
+    let adapter = RNFBFIROptionsConfiguringAdapter(live)
+
+    _ = RNFBAppModuleFirebase.configureOrReuseApp(
+      options: adapter,
+      nameResolution: names,
+      lifecycle: lifecycle
+    )
+
+    XCTAssertTrue(lifecycle.lastConfigureOptions === live)
   }
 
   func testRegisterLibraryOnceOnlyRegistersOnce() {
