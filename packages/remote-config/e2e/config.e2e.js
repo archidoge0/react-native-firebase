@@ -444,10 +444,12 @@ describe('remoteConfig()', function () {
 
       it('resolves with defaults including a null value', async function () {
         const { getRemoteConfig } = remoteConfigModular;
-        await getRemoteConfig().setDefaults({
-          some_key: 'setDefaults_e2e',
-          null_default: null,
-        });
+        // Android setDefaultsAsync NPEs on null values.
+        const defaults = { some_key: 'setDefaults_e2e' };
+        if (Platform.ios) {
+          defaults.null_default = null;
+        }
+        await getRemoteConfig().setDefaults(defaults);
       });
     });
 
