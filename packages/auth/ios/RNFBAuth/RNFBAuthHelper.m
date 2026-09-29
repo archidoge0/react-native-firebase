@@ -21,6 +21,8 @@
 #import "RNFBSharedUtils.h"
 
 @interface RNFBAuthHelper : NSObject
++ (NSDictionary *)decodedProfileProps:(NSDictionary *)props;
++ (NSURL *)photoURLFromDecodedValue:(id)value;
 @end
 
 #else
@@ -224,11 +226,31 @@ static __strong RNFBAuthCacheRegistry *cachedTotpSecrets;
 @implementation RNFBAuthHelper
 
 /**
- * Testable seam: decode New Architecture null sentinels before profileChangeRequest writes.
- * displayName/photoURL null arrive as props[key] = { __rnfbNull: true }.
+ * Testable seam: decode New Architecture null sentinels and turn NSNull into nil before
+ * profileChangeRequest writes. FIRUserProfileChangeRequest clears a field when the property
+ * is set to nil (not the same as leaving it unassigned). NSDictionary cannot store nil, so
+ * cleared keys are omitted and subscript returns nil, the same value updateProfile reads.
+ * displayName/photoURL null arrive as { __rnfbNull: true } and/or NSNull after decode.
  */
 + (NSDictionary *)decodedProfileProps:(NSDictionary *)props {
-  return [RNFBSharedUtils decodeNullSentinels:props];
+  NSDictionary *decoded = [RNFBSharedUtils decodeNullSentinels:props];
+  NSMutableDictionary *normalized = [NSMutableDictionary dictionaryWithCapacity:decoded.count];
+  for (NSString *key in decoded) {
+    id value = decoded[key];
+    if (value == [NSNull null]) {
+      continue;
+    }
+    normalized[key] = value;
+  }
+  return normalized;
+}
+
+/**
+ * photoURL clear arm: omitted/nil decoded value must become nil (not @""), not URLWithString:.
+ * Lives on the unit-testable seam so XCTest can hit the nil branch without Firebase Auth.
+ */
++ (NSURL *)photoURLFromDecodedValue:(id)value {
+  return value == nil ? nil : [NSURL URLWithString:value];
 }
 
 #if !RNFB_AUTH_UNIT_TEST
@@ -674,18 +696,15 @@ static __strong RNFBAuthCacheRegistry *cachedTotpSecrets;
 
   if (user) {
     FIRUserProfileChangeRequest *changeRequest = [user profileChangeRequest];
+    // Seam omits NSNull keys (subscript → nil). Iterate the original props keys so a
+    // cleared displayName/photoURL still reaches setValue:forKey: / URLWithString:.
     NSDictionary *decodedProps = [self decodedProfileProps:props];
-    NSMutableArray *allKeys = [[decodedProps allKeys] mutableCopy];
 
-    for (NSString *key in allKeys) {
+    for (NSString *key in props) {
       @try {
         id value = decodedProps[key];
-        if (value == [NSNull null]) {
-          value = nil;
-        }
         if ([key isEqualToString:keyPhotoUrl]) {
-          NSURL *url = value == nil ? nil : [NSURL URLWithString:value];
-          [changeRequest setValue:url forKey:key];
+          [changeRequest setValue:[self photoURLFromDecodedValue:value] forKey:key];
         } else {
           [changeRequest setValue:value forKey:key];
         }

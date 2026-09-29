@@ -20,10 +20,12 @@
 /**
  * Declares the testable decode seam compiled from RNFBAuthHelper.m under
  * -DRNFB_AUTH_UNIT_TEST (Firebase SDK paths omitted). The unit-test target compiles
- * packages/app/ios/RNFBApp/RNFBSharedUtils.m so the seam calls the production decoder.
+ * packages/app/ios/RNFBApp/RNFBSharedUtils.m so the seam calls the production decoder
+ * and converts NSNull to nil (omitted keys) before updateProfile writes.
  */
 @interface RNFBAuthHelper : NSObject
 + (NSDictionary *)decodedProfileProps:(NSDictionary *)props;
++ (NSURL *)photoURLFromDecodedValue:(id)value;
 @end
 
 @interface RNFBAuthNullSentinelDecodeTests : XCTestCase
@@ -39,18 +41,41 @@
   return @{@".sv" : @"timestamp"};
 }
 
-- (void)testUpdateProfile_displayNameNullSentinel_becomesNSNull {
+- (void)testUpdateProfile_displayNameNullSentinel_becomesNil {
   NSDictionary *props = @{@"displayName" : [self nullSentinel]};
   NSDictionary *decoded = [RNFBAuthHelper decodedProfileProps:props];
-  XCTAssertEqualObjects(decoded[@"displayName"], [NSNull null]);
+  XCTAssertNil(decoded[@"displayName"]);
   XCTAssertFalse([decoded[@"displayName"] isKindOfClass:[NSDictionary class]]);
 }
 
-- (void)testUpdateProfile_photoURLNullSentinel_becomesNSNull {
+- (void)testUpdateProfile_photoURLNullSentinel_becomesNil {
   NSDictionary *props = @{@"photoURL" : [self nullSentinel]};
   NSDictionary *decoded = [RNFBAuthHelper decodedProfileProps:props];
-  XCTAssertEqualObjects(decoded[@"photoURL"], [NSNull null]);
+  XCTAssertNil(decoded[@"photoURL"]);
   XCTAssertFalse([decoded[@"photoURL"] isKindOfClass:[NSDictionary class]]);
+  // Same path updateProfile uses: seam omit → subscript nil → clear arm (nil, not URLWithString:).
+  XCTAssertNil([RNFBAuthHelper photoURLFromDecodedValue:decoded[@"photoURL"]]);
+}
+
+- (void)testUpdateProfile_photoURLFromDecodedValue_nilClearsWithoutURLWithString {
+  XCTAssertNil([RNFBAuthHelper photoURLFromDecodedValue:nil]);
+}
+
+- (void)testUpdateProfile_photoURLFromDecodedValue_stringBecomesNSURL {
+  NSURL *url = [RNFBAuthHelper photoURLFromDecodedValue:@"https://example.com/a.jpg"];
+  XCTAssertEqualObjects(url.absoluteString, @"https://example.com/a.jpg");
+}
+
+- (void)testUpdateProfile_displayNameNSNull_becomesNil {
+  NSDictionary *props = @{@"displayName" : [NSNull null]};
+  NSDictionary *decoded = [RNFBAuthHelper decodedProfileProps:props];
+  XCTAssertNil(decoded[@"displayName"]);
+}
+
+- (void)testUpdateProfile_photoURLNSNull_becomesNil {
+  NSDictionary *props = @{@"photoURL" : [NSNull null]};
+  NSDictionary *decoded = [RNFBAuthHelper decodedProfileProps:props];
+  XCTAssertNil(decoded[@"photoURL"]);
 }
 
 - (void)testUpdateProfile_unrelatedOneKeyDictionary_unchanged {
