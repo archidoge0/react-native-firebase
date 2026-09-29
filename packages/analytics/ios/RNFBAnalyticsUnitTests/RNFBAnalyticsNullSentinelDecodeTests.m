@@ -18,12 +18,14 @@
 #import <XCTest/XCTest.h>
 
 /**
- * Declares the testable decode seam compiled from RNFBAnalyticsHelper.m.
+ * Declares the testable decode seams compiled from RNFBAnalyticsHelper.m.
  * The unit-test target compiles packages/app/ios/RNFBApp/RNFBSharedUtils.m so the
- * seam calls the production decoder.
+ * seams call the production decoder.
  */
 @interface RNFBAnalyticsHelper : NSObject
 + (NSDictionary *)decodedParams:(NSDictionary *)params;
++ (NSDictionary *)logEventParams:(NSDictionary *)params;
++ (NSDictionary *)decodedUserProperties:(NSDictionary *)properties;
 @end
 
 @interface RNFBAnalyticsNullSentinelDecodeTests : XCTestCase
@@ -39,18 +41,22 @@
   return @{@".sv" : @"timestamp"};
 }
 
-- (void)testLogEventParams_childNullSentinel_becomesNSNull {
+- (void)testLogEventParams_childNullSentinel_isOmitted {
   NSDictionary *params = @{@"item" : [self nullSentinel], @"value" : @1};
-  NSDictionary *decoded = [RNFBAnalyticsHelper decodedParams:params];
-  XCTAssertEqualObjects(decoded[@"item"], [NSNull null]);
+  NSDictionary *decoded = [RNFBAnalyticsHelper logEventParams:params];
+  XCTAssertNil(decoded[@"item"]);
+  XCTAssertFalse([decoded[@"item"] isKindOfClass:[NSDictionary class]]);
+  XCTAssertNotEqualObjects(decoded[@"item"], [NSNull null]);
   XCTAssertEqualObjects(decoded[@"value"], @1);
 }
 
-- (void)testSetUserProperties_childNullSentinel_becomesNSNull {
+- (void)testSetUserProperties_childNullSentinel_becomesNil {
   NSDictionary *properties = @{@"favorite_food" : [self nullSentinel]};
-  NSDictionary *decoded = [RNFBAnalyticsHelper decodedParams:properties];
-  XCTAssertEqualObjects(decoded[@"favorite_food"], [NSNull null]);
+  NSDictionary *decoded = [RNFBAnalyticsHelper decodedUserProperties:properties];
+  // Omitted key → subscript nil, same value setUserPropertyString:forName: uses to clear.
+  XCTAssertNil(decoded[@"favorite_food"]);
   XCTAssertFalse([decoded[@"favorite_food"] isKindOfClass:[NSDictionary class]]);
+  XCTAssertNotEqualObjects(decoded[@"favorite_food"], [NSNull null]);
 }
 
 - (void)testSetDefaultEventParameters_childNullSentinel_becomesNSNull {
@@ -63,6 +69,34 @@
   NSDictionary *params = @{@"custom" : [self unrelatedOneKeyDictionary]};
   NSDictionary *decoded = [RNFBAnalyticsHelper decodedParams:params];
   XCTAssertEqualObjects(decoded[@"custom"], [self unrelatedOneKeyDictionary]);
+  NSDictionary *logEventDecoded = [RNFBAnalyticsHelper logEventParams:params];
+  XCTAssertEqualObjects(logEventDecoded[@"custom"], [self unrelatedOneKeyDictionary]);
+  NSDictionary *userPropsDecoded = [RNFBAnalyticsHelper decodedUserProperties:params];
+  XCTAssertEqualObjects(userPropsDecoded[@"custom"], [self unrelatedOneKeyDictionary]);
+}
+
+- (void)testLogEventParams_nilInput_returnsNil {
+  XCTAssertNil([RNFBAnalyticsHelper logEventParams:nil]);
+}
+
+- (void)testLogEventParams_NSNullInput_returnsNil {
+  XCTAssertNil([RNFBAnalyticsHelper logEventParams:(id)[NSNull null]]);
+}
+
+- (void)testLogEventParams_nonDictionaryInput_returnsNil {
+  XCTAssertNil([RNFBAnalyticsHelper logEventParams:(id) @"not-a-dictionary"]);
+}
+
+- (void)testDecodedUserProperties_nilInput_returnsNil {
+  XCTAssertNil([RNFBAnalyticsHelper decodedUserProperties:nil]);
+}
+
+- (void)testDecodedUserProperties_NSNullInput_returnsNil {
+  XCTAssertNil([RNFBAnalyticsHelper decodedUserProperties:(id)[NSNull null]]);
+}
+
+- (void)testDecodedUserProperties_nonDictionaryInput_returnsNil {
+  XCTAssertNil([RNFBAnalyticsHelper decodedUserProperties:(id) @42]);
 }
 
 @end

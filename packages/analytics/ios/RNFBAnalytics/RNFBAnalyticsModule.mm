@@ -122,7 +122,7 @@ RCT_EXPORT_MODULE(NativeRNFBTurboAnalytics)
          resolve:(RCTPromiseResolveBlock)resolve
           reject:(RCTPromiseRejectBlock)reject {
   @try {
-    NSDictionary *decoded = [RNFBAnalyticsHelper decodedParams:params];
+    NSDictionary *decoded = [RNFBAnalyticsHelper logEventParams:params];
     [FIRAnalytics logEventWithName:name parameters:[self cleanJavascriptParams:decoded]];
   } @catch (NSException *exception) {
     return [RNFBSharedUtils rejectPromiseWithExceptionDict:reject exception:exception];
@@ -170,10 +170,12 @@ RCT_EXPORT_MODULE(NativeRNFBTurboAnalytics)
                   resolve:(RCTPromiseResolveBlock)resolve
                    reject:(RCTPromiseRejectBlock)reject {
   @try {
-    NSDictionary *decoded = [RNFBAnalyticsHelper decodedParams:properties];
-    [decoded enumerateKeysAndObjectsUsingBlock:^(id key, id value, BOOL *stop) {
-      [FIRAnalytics setUserPropertyString:[self convertNSNullToNil:value] forName:key];
-    }];
+    // Seam omits NSNull keys (subscript → nil). Iterate the original keys so a cleared
+    // property still reaches setUserPropertyString:forName: (nil removes the property).
+    NSDictionary *decoded = [RNFBAnalyticsHelper decodedUserProperties:properties];
+    for (NSString *key in properties) {
+      [FIRAnalytics setUserPropertyString:decoded[key] forName:key];
+    }
   } @catch (NSException *exception) {
     return [RNFBSharedUtils rejectPromiseWithExceptionDict:reject exception:exception];
   }
