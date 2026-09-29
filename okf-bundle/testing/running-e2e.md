@@ -270,6 +270,8 @@ No in-flight test run on the target platform:
 | **iOS**     | `yarn tests:e2e:check --platform=ios` passes — **zero booted simulators** and no stray listener on `:8090`. Detox boots `iPhone 17` from `tests/.detoxrc.js`; do not pre-boot or leave simulators running. Plain [host-clear probes](#host-clear-probes) without `--platform=ios` intentionally do **not** fail on an unrelated booted simulator — see [global device scoping](#global-device-scoping). |
 | **macOS**   | [Host-clear probes](#host-clear-probes) pass (no macOS test app process — default `io.invertase.testing`, or `RNFB_MACOS_PRODUCT_NAME` when set)                                                                                                                                                                                                                                                        |
 
+**Gotcha (iOS check vs release):** `yarn tests:e2e:check --platform=ios` stays BUSY if **any** simulator is booted. Scoped `yarn tests:e2e:release` (including `--devices` and `--platform=ios --devices`) only shuts down the default `iPhone 17` — a different booted simulator is left running, so check can still fail and iOS `:build` / `:test-cover` cannot start. Do **not** invent `simctl` shutdown lists or use `yarn tests:e2e:release --all-slots` while another owner might be live.
+
 Also wait for any visible unfinished `yarn tests:*:test-cover`.
 
 <a id="android-app-reset-blocking"></a>
