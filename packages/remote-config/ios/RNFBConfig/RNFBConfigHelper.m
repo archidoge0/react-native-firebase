@@ -120,7 +120,6 @@ static FIRApp *firebaseAppForName(NSString *appName) {
 
 #if !RNFB_CONFIG_UNIT_TEST
 
-
 + (void)initializeConfigUpdateHandlersOnce {
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{

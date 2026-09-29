@@ -233,7 +233,6 @@ static __strong RNFBAuthCacheRegistry *cachedTotpSecrets;
 
 #if !RNFB_AUTH_UNIT_TEST
 
-
 #pragma mark -
 #pragma mark Shared state
 
