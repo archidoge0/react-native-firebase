@@ -59,7 +59,7 @@
 
 - (void)setLogLevel:(NSString *)logLevel {
   int level = (int)[RNFBAppLogLevelMapper loggerLevelForString:logLevel];
-  [[FIRConfiguration sharedInstance] setLoggerLevel:(FIRLoggerLevel)level];
+  [RNFBAppModuleFirebase setLoggerLevel:level];
 }
 
 @end

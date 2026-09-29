@@ -15,17 +15,10 @@
  *
  */
 
-#if __has_include(<Firebase/Firebase.h>)
-#import <Firebase/Firebase.h>
-#elif __has_include(<FirebaseCore/FirebaseCore.h>)
-#import <FirebaseCore/FirebaseCore.h>
-#else
-@import FirebaseCore;
-#endif
+#import <React/RCTBridge.h>
 #import <React/RCTInvalidating.h>
 #import <React/RCTUtils.h>
 
-#import "RCTConvert+FIRApp.h"
 #import "RNFBAppModule.h"
 #import "RNFBAppTurboModules.h"
 #import "RNFBJSON.h"
@@ -45,43 +38,15 @@
 #error "RNFBApp Swift interface not found"
 #endif
 
-#if __has_include(<FirebaseCore/FIRAppInternal.h>)
-#import <FirebaseCore/FIRAppInternal.h>
-#define REGISTER_LIB
-#endif
-
 @interface RNFBAppModule () <NativeRNFBTurboAppSpec, RCTInvalidating>
 
-+ (void)setCustomDomain:(nullable NSString *)authDomain forAppName:(NSString *)appName;
+- (void)completeInitializeApp:(id)firApp
+                   authDomain:(nullable NSString *)authDomain
+                    jsAppName:(NSString *)jsAppName
+                    appConfig:(NSDictionary *)appConfig
+                      resolve:(RCTPromiseResolveBlock)resolve;
 
 @end
-
-/**
- * Adapts `[[FIROptions alloc] initWithGoogleAppID:GCMSenderID:]` for
- * `RNFBAppInitializeOptionsMapper` (same shape as `RCTConvert+FIROptions.m`).
- * Must sit outside `@implementation RNFBAppModule` (nested @implementation is invalid).
- */
-@interface RNFBAppModuleFIROptionsFactory : NSObject <RNFBFIROptionsCreating>
-@end
-
-@implementation RNFBAppModuleFIROptionsFactory
-
-- (id<RNFBFIROptionsConfiguring>)createWithGoogleAppID:(NSString *)googleAppID
-                                           gcmSenderID:(NSString *)gcmSenderID {
-  return (id<RNFBFIROptionsConfiguring>)[[FIROptions alloc] initWithGoogleAppID:googleAppID
-                                                                    GCMSenderID:gcmSenderID];
-}
-
-@end
-
-static id<RNFBFIROptionsCreating> RNFBAppModuleOptionsFactory(void) {
-  static RNFBAppModuleFIROptionsFactory *sharedFactory;
-  static dispatch_once_t onceToken;
-  dispatch_once(&onceToken, ^{
-    sharedFactory = [[RNFBAppModuleFIROptionsFactory alloc] init];
-  });
-  return sharedFactory;
-}
 
 @implementation RNFBAppModule
 
@@ -99,18 +64,11 @@ RCT_EXPORT_MODULE(NativeRNFBTurboApp)
   [RNFBRCTEventEmitter shared].bridge = bridge;
 }
 
-- (RCTBridge *)bridge {
-  return [RNFBRCTEventEmitter shared].bridge;
-}
-
 - (id)init {
   if (self = [super init]) {
-#ifdef REGISTER_LIB
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-      [FIRApp registerLibrary:@"react-native-firebase" withVersion:[RNFBVersionString copy]];
-    });
-#endif
+    // Once-gate lives solely in RNFBAppModuleFirebase.registerLibraryOnce.
+    [RNFBAppModuleFirebase registerLibraryOnceWithName:@"react-native-firebase"
+                                               version:[RNFBVersionString copy]];
     if ([[RNFBJSON shared] contains:@"app_log_level"]) {
       NSString *logLevel = [[RNFBJSON shared] getStringValue:@"app_log_level" defaultValue:@"info"];
       [self setLogLevel:logLevel];
@@ -120,20 +78,16 @@ RCT_EXPORT_MODULE(NativeRNFBTurboApp)
   return self;
 }
 
-- (void)invalidate {
-  [[RNFBRCTEventEmitter shared] invalidate];
-}
-
 #pragma mark -
 #pragma mark Constants
 
 - (NSDictionary *)appConstantsDictionary {
-  NSDictionary *firApps = [FIRApp allApps];
+  NSArray *firApps = [RNFBAppModuleFirebase allApps];
   NSMutableArray *appsArray = [NSMutableArray new];
   NSMutableDictionary *constants = [NSMutableDictionary new];
 
-  for (id key in firApps) {
-    [appsArray addObject:[RNFBSharedUtils firAppToDictionary:firApps[key]]];
+  for (id firApp in firApps) {
+    [appsArray addObject:[RNFBSharedUtils firAppToDictionary:firApp]];
   }
 
   constants[@"NATIVE_FIREBASE_APPS"] = appsArray;
@@ -238,39 +192,25 @@ RCT_EXPORT_MODULE(NativeRNFBTurboApp)
               resolve:(RCTPromiseResolveBlock)resolve
                reject:(RCTPromiseRejectBlock)reject {
   RCTUnsafeExecuteOnMainQueueSync(^{
-    FIRApp *firApp;
+    id firApp;
     RNFBAppInitializeNameResolution *names =
         [RNFBAppInitializeOptionsMapper resolveNameFromAppConfig:appConfig];
     NSString *authDomain = [RNFBAppInitializeOptionsMapper authDomainFromOptions:options];
-    FIROptions *firOptions = (FIROptions *)[RNFBAppInitializeOptionsMapper
-        buildOptionsFrom:options
-          optionsFactory:RNFBAppModuleOptionsFactory()];
+    id firOptions =
+        [RNFBAppInitializeOptionsMapper buildOptionsFrom:options
+                                          optionsFactory:[RNFBAppModuleFirebase optionsFactory]];
 
     @try {
-      if (names.isDefaultApp) {
-        // Native bootstrap often already called [FIRApp configure]. Still accept a JS/bridge
-        // initializeApp for the default app so customAuthDomains can be keyed by [DEFAULT].
-        if ([FIRApp defaultApp] != nil) {
-          firApp = [FIRApp defaultApp];
-        } else {
-          [FIRApp configureWithOptions:firOptions];
-          firApp = [FIRApp defaultApp];
-        }
-      } else {
-        [FIRApp configureWithName:names.appName options:firOptions];
-        firApp = [FIRApp appNamed:names.appName];
-      }
+      firApp = [RNFBAppModuleFirebase configureOrReuseAppWithOptions:firOptions
+                                                      nameResolution:names];
     } @catch (NSException *exception) {
       return [RNFBSharedUtils rejectPromiseWithExceptionDict:reject exception:exception];
     }
 
     // Store under the JS bridge app name ([DEFAULT]), never native __FIRAPP_DEFAULT.
-    [RNFBAppModule setCustomDomain:authDomain forAppName:names.jsAppName];
-
-    firApp.dataCollectionDefaultEnabled =
-        (BOOL)[appConfig valueForKey:@"automaticDataCollectionEnabled"];
-
-    resolve([RNFBSharedUtils firAppToDictionary:firApp]);
+    // clang-format off
+    [self completeInitializeApp:firApp authDomain:authDomain jsAppName:names.jsAppName appConfig:appConfig resolve:resolve];
+    // clang-format on
   });
 }
 
@@ -278,46 +218,20 @@ RCT_EXPORT_MODULE(NativeRNFBTurboApp)
   return [RNFBAppCustomAuthDomains getCustomDomain:appName];
 }
 
-+ (void)setCustomDomain:(nullable NSString *)authDomain forAppName:(NSString *)appName {
-  [RNFBAppCustomAuthDomains setCustomDomain:authDomain forAppName:appName];
-}
-
 - (void)setLogLevel:(NSString *)logLevel {
   int level = (int)[RNFBAppLogLevelMapper loggerLevelForString:logLevel];
   DLog(@"RNFBSetLogLevel: setting level to %d from %@.", level, logLevel);
-  [[FIRConfiguration sharedInstance] setLoggerLevel:(FIRLoggerLevel)level];
+  [RNFBAppModuleFirebase setLoggerLevel:level];
 }
 
 - (void)setAutomaticDataCollectionEnabled:(NSString *)appName enabled:(BOOL)enabled {
-  FIRApp *firApp = [RCTConvert firAppFromString:appName];
-  if (firApp) {
-    firApp.dataCollectionDefaultEnabled = enabled;
-  }
+  [RNFBAppModuleFirebase setAutomaticDataCollectionEnabled:enabled forAppName:appName];
 }
 
 - (void)deleteApp:(NSString *)appName
           resolve:(RCTPromiseResolveBlock)resolve
            reject:(RCTPromiseRejectBlock)reject {
-  FIRApp *firApp = [RCTConvert firAppFromString:appName];
-  if (!firApp) {
-    return resolve([NSNull null]);
-  }
-
-  [firApp deleteApp:^(BOOL success) {
-    if (success) {
-      [RNFBAppModule setCustomDomain:nil forAppName:appName];
-      resolve([NSNull null]);
-    } else {
-      [firApp deleteApp:^(BOOL success2) {
-        if (success2) {
-          [RNFBAppModule setCustomDomain:nil forAppName:appName];
-          resolve([NSNull null]);
-        } else {
-          reject(@"app/delete-app-failed", @"Failed to delete the specified app.", nil);
-        }
-      }];
-    }
-  }];
+  [RNFBAppModuleFirebase deleteAppNamed:appName resolve:resolve reject:reject];
 }
 
 + (BOOL)requiresMainQueueSetup {
