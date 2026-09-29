@@ -22,9 +22,24 @@
 @implementation RNFBNullSentinelInterceptor
 
 + (void)load {
+  [self scheduleSwizzleOnMainQueue];
+}
+
++ (void)scheduleSwizzleOnMainQueue {
   static dispatch_once_t onceToken;
-  dispatch_once(&onceToken, ^{
-    [self swizzleRCTConvertMethods];
+  [self scheduleSwizzleOnMainQueueWithOnceToken:&onceToken turboConvertClass:Nil];
+}
+
++ (void)scheduleSwizzleOnMainQueueWithOnceToken:(dispatch_once_t *)onceToken
+                              turboConvertClass:(Class)turboConvertClass {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    dispatch_once(onceToken, ^{
+      if (turboConvertClass) {
+        [self swizzleTurboModuleConversions:turboConvertClass];
+      } else {
+        [self swizzleRCTConvertMethods];
+      }
+    });
   });
 }
 
