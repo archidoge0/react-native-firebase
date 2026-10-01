@@ -1,0 +1,89 @@
+name: GHAV RNFirebase 5281 complete ESLint cache version
+
+on:
+  push:
+    branches:
+      - 'codex/ghav-rnf5281-eslint-*'
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: read
+
+jobs:
+  linting:
+    name: ESLint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout fixed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: archidoge0/react-native-firebase
+          ref: 221eb5001f69fb3c8586e4cdef4e74dad3380c08
+          persist-credentials: false
+
+      - name: Setup historical Node 14
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '14.21.3'
+
+      - name: Install Yarn Classic
+        run: npm install -g --force yarn@1.22.22
+
+      - name: Resolve Yarn cache directory
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Yarn package cache
+        id: yarn-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-ghav5281eslint-yarn-v1-${{ hashFiles('**/package.json') }}
+          restore-keys: ${{ runner.os }}-ghav5281eslint-yarn-v1
+
+      - name: Record task context
+        run: |
+          echo "GHAV_SOURCE_SHA=$(git rev-parse HEAD)"
+          echo "GHAV_LOCK_SHA=$(sha256sum yarn.lock | cut -d ' ' -f1)"
+          echo "GHAV_NODE_VERSION=$(node --version)"
+          echo "GHAV_YARN_VERSION=$(yarn --version)"
+          echo "GHAV_CACHE_HIT=${{ steps.yarn-cache.outputs.cache-hit }}"
+          echo "GHAV_CACHE_PRIMARY_KEY=${{ steps.yarn-cache.outputs.cache-primary-key }}"
+          echo "GHAV_CACHE_MATCHED_KEY=${{ steps.yarn-cache.outputs.cache-matched-key }}"
+
+      - name: Yarn Install
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60
+        with:
+          timeout_minutes: 3
+          retry_wait_seconds: 30
+          max_attempts: 3
+          command: yarn --no-audit --prefer-offline
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Save Code Linting Report JSON
+        run: yarn lint:report
+        continue-on-error: true
+
+      - name: Record report witness
+        run: |
+          test -s eslint-report.json
+          echo "GHAV_REPORT_SHA=$(sha256sum eslint-report.json | cut -d ' ' -f1)"
+          node -e 'const a=require("./eslint-report.json"); console.log("GHAV_REPORT_FILES="+a.length); console.log("GHAV_REPORT_ERRORS="+a.reduce((n,x)=>n+x.errorCount,0)); console.log("GHAV_REPORT_WARNINGS="+a.reduce((n,x)=>n+x.warningCount,0))'
+
+      - name: Annotate Code Linting Results
+        uses: ataylorme/eslint-annotate-action@5a8d8ab89a57679e90c32750e0f382e9d8570750
+        continue-on-error: true
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          report-json: 'eslint-report.json'
+          only-pr-files: 'false'
+
+      - name: Upload ESLint report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: eslint-report-json
+          path: eslint-report.json
