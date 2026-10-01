@@ -1,0 +1,79 @@
+name: GHAV RNFirebase 5281 complete Jest and coverage submission
+on:
+  push:
+    branches: ['codex/ghav-rnf5281-jest-v1-*']
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  jest:
+    name: Complete Jest and Codecov job
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    steps:
+      - name: Checkout fixed historical source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 221eb5001f69fb3c8586e4cdef4e74dad3380c08
+          fetch-depth: 50
+          persist-credentials: false
+      - name: Setup historical Node 14
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '14.21.3'
+      - name: Install Yarn Classic
+        run: npm install -g --force yarn@1.22.22
+      - name: Resolve Yarn cache directory
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
+      - name: Restore Yarn package cache
+        id: yarn-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-ghav5281jest-v1-yarn-${{ hashFiles('**/package.json') }}
+          restore-keys: ${{ runner.os }}-ghav5281jest-v1-yarn
+      - name: Record task context
+        shell: bash
+        run: |
+          echo "GHAV_SOURCE_SHA=$(git rev-parse HEAD)"
+          echo "GHAV_SOURCE_TREE=$(git rev-parse HEAD^{tree})"
+          echo "GHAV_LOCK_SHA=$(sha256sum yarn.lock | cut -d ' ' -f1)"
+          echo "GHAV_NODE_VERSION=$(node --version)"
+          echo "GHAV_YARN_VERSION=$(yarn --version)"
+          echo "GHAV_CACHE_HIT=${{ steps.yarn-cache.outputs.cache-hit }}"
+          echo "GHAV_CACHE_PRIMARY_KEY=${{ steps.yarn-cache.outputs.cache-primary-key }}"
+          echo "GHAV_CACHE_MATCHED_KEY=${{ steps.yarn-cache.outputs.cache-matched-key }}"
+      - name: Yarn Install
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60
+        with:
+          timeout_minutes: 5
+          retry_wait_seconds: 60
+          max_attempts: 3
+          command: yarn --no-audit --prefer-offline
+      - name: Run complete Jest coverage
+        run: yarn tests:jest-coverage
+      - name: Record complete coverage output
+        run: |
+          test -s coverage/lcov.info
+          echo "GHAV_LCOV_BYTES=$(wc -c < coverage/lcov.info | tr -d ' ')"
+          echo "GHAV_LCOV_SHA=$(sha256sum coverage/lcov.info | cut -d ' ' -f1)"
+          echo "GHAV_LCOV_LINES=$(wc -l < coverage/lcov.info | tr -d ' ')"
+          test -s coverage/clover.xml
+          test -s coverage/coverage-final.json
+          echo "GHAV_CLOVER_SHA=$(sha256sum coverage/clover.xml | cut -d ' ' -f1)"
+          echo "GHAV_FINAL_SHA=$(sha256sum coverage/coverage-final.json | cut -d ' ' -f1)"
+          echo "GHAV_LOCK_SHA_AFTER=$(sha256sum yarn.lock | cut -d ' ' -f1)"
+          echo "GHAV_TRACKED_DIFF_LINES=$(git diff --numstat | wc -l | tr -d ' ')"
+      - name: Submit complete coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5
+        with:
+          use_oidc: true
+          fail_ci_if_error: true
+          files: ./coverage/lcov.info,./coverage/clover.xml,./coverage/coverage-final.json
+          disable_search: true
+          override_commit: 221eb5001f69fb3c8586e4cdef4e74dad3380c08
+          override_branch: ghav-fixed-rnf5281-jest
+          verbose: true
