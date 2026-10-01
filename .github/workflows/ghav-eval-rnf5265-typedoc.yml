@@ -1,0 +1,63 @@
+name: GHAV RNFirebase 5265 TypeDoc cache prefix
+on:
+  push:
+    branches: ['codex/ghav-rnf5265-typedoc-*']
+permissions:
+  contents: read
+jobs:
+  typedoc:
+    name: TypeDoc Generation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout fixed source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 0b62d5ac9a31f4d840c45ea41aeb89a7c2ecbaf3
+          persist-credentials: false
+      - name: Setup historical Node 14
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '14.21.3'
+      - name: Install Yarn Classic
+        run: npm install -g --force yarn@1.22.22
+      - name: Resolve Yarn cache directory
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
+      - name: Restore Yarn package cache
+        id: yarn-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: rnf5265-typedoc-${{ runner.os }}-yarn-${{ hashFiles('**/package.json') }}-with-website
+          restore-keys: rnf5265-typedoc-${{ runner.os }}-yarn-
+      - name: Record task context
+        shell: bash
+        run: |
+          echo "GHAV_SOURCE_SHA=$(git rev-parse HEAD)"
+          echo "GHAV_LOCK_SHA=$(sha256sum yarn.lock | cut -d ' ' -f1)"
+          echo "GHAV_NODE_VERSION=$(node --version)"
+          echo "GHAV_YARN_VERSION=$(yarn --version)"
+          echo "GHAV_CACHE_HIT=${{ steps.yarn-cache.outputs.cache-hit }}"
+      - name: Yarn Install
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60
+        with:
+          timeout_minutes: 3
+          retry_wait_seconds: 30
+          max_attempts: 3
+          command: yarn --no-audit --prefer-offline
+      - name: Yarn Install (Website)
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60
+        with:
+          timeout_minutes: 3
+          retry_wait_seconds: 30
+          max_attempts: 3
+          command: cd website && yarn --no-audit --prefer-offline
+      - name: Generate TypeDoc
+        run: node -e "require('./website/scripts/generate-typedoc').generateTypedoc()"
+      - name: Record TypeDoc output witness
+        shell: bash
+        run: |
+          test -s typedoc.json
+          echo "GHAV_TYPEDOC_SHA=$(sha256sum typedoc.json | cut -d ' ' -f1)"
+          echo "GHAV_TYPEDOC_BYTES=$(wc -c < typedoc.json | tr -d ' ')"
