@@ -1,0 +1,170 @@
+name: "ghav before: Code Quality Checks"
+"on":
+  push:
+    branches:
+      - ghav/dev/7322
+    paths:
+      - .ghav/before
+jobs:
+  linting:
+    name: Lint
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+      - uses: actions/cache/restore@v3
+        name: Yarn Cache Restore
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-v1-${{ hashFiles('yarn.lock') }}
+          restore-keys: ${{ runner.os }}-yarn-v1
+      - name: Yarn Install
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 15
+          retry_wait_seconds: 30
+          max_attempts: 3
+          command: yarn --no-audit --prefer-offline
+      - name: Lint
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 3
+          retry_wait_seconds: 10
+          max_attempts: 3
+          command: yarn lint
+      - uses: actions/cache/save@v3
+        name: Yarn Cache Save
+        if: ${{ github.ref == 'refs/heads/main' }}
+        with:
+          path: ${{ steps.workflow-variables.outputs.yarn-cache-dir }}
+          key: ${{ runner.os }}-yarn-v1-${{ hashFiles('yarn.lock') }}
+  typescript:
+    name: TypeScript Build Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+      - uses: actions/cache/restore@v3
+        name: Yarn Cache Restore
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-v1-${{ hashFiles('yarn.lock') }}
+          restore-keys: ${{ runner.os }}-yarn-v1
+      - name: Yarn Install
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 15
+          retry_wait_seconds: 30
+          max_attempts: 3
+          command: yarn --no-audit --prefer-offline
+      - name: Lint
+        run: yarn tsc:compile
+      - uses: actions/cache/save@v3
+        name: Yarn Cache Save
+        if: ${{ github.ref == 'refs/heads/main' }}
+        with:
+          path: ${{ steps.workflow-variables.outputs.yarn-cache-dir }}
+          key: ${{ runner.os }}-yarn-v1-${{ hashFiles('yarn.lock') }}
+  typedoc:
+    name: TypeDoc Generation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+      - uses: actions/cache/restore@v3
+        name: Yarn Cache Restore
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-with-website-v1-${{ hashFiles('yarn.lock') }}
+          restore-keys: ${{ runner.os }}-yarn-with-website-v1
+      - name: Yarn Install
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 15
+          retry_wait_seconds: 30
+          max_attempts: 3
+          command: yarn --no-audit --prefer-offline
+      - name: Yarn Install (Website)
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 3
+          retry_wait_seconds: 30
+          max_attempts: 3
+          command: cd website && yarn --no-audit --prefer-offline
+      - name: Generate TypeDoc
+        run: node -e "require('./website/scripts/generate-typedoc').generateTypedoc()"
+      - uses: actions/cache/save@v3
+        name: Yarn Cache Save
+        if: ${{ github.ref == 'refs/heads/main' }}
+        with:
+          path: ${{ steps.workflow-variables.outputs.yarn-cache-dir }}
+          key: ${{ runner.os }}-yarn-v1-${{ hashFiles('yarn.lock') }}
+  jest:
+    name: Jest
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    env: {}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 50
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18.15.0
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+      - uses: actions/cache/restore@v3
+        name: Yarn Cache Restore
+        id: yarn-cache
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-v1-${{ hashFiles('yarn.lock') }}
+          restore-keys: ${{ runner.os }}-yarn-v1
+      - name: Yarn Install
+        uses: nick-fields/retry@v2
+        with:
+          timeout_minutes: 15
+          retry_wait_seconds: 60
+          max_attempts: 3
+          command: yarn --no-audit --prefer-offline
+      - name: Jest
+        run: yarn tests:jest-coverage
+      - uses: actions/cache/save@v3
+        name: Yarn Cache Save
+        if: ${{ github.ref == 'refs/heads/main' }}
+        with:
+          path: ${{ steps.workflow-variables.outputs.yarn-cache-dir }}
+          key: ${{ runner.os }}-yarn-v1-${{ hashFiles('yarn.lock') }}

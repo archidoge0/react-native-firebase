@@ -2,23 +2,6 @@ name: 'Create Test Patches'
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - '**'
-    paths-ignore:
-      - 'docs/**'
-      - 'website/**'
-      - '.spellcheck.dict.txt'
-      - '**/*.md'
-  pull_request:
-    branches:
-      - '**'
-    paths-ignore:
-      - 'docs/**'
-      - 'website/**'
-      - '.spellcheck.dict.txt'
-      - '**/*.md'
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
